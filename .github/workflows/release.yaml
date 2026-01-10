@@ -45,7 +45,7 @@ jobs:
           cat > ~/.config/copr <<EOF
           [copr-cli]
           login = ${{ secrets.COPR_LOGIN }}
-          username = vietsman
+          username = f1ana
           token = ${{ secrets.COPR_TOKEN }}
           copr_url = https://copr.fedorainfracloud.org
           EOF
@@ -53,6 +53,7 @@ jobs:
       - name: Upload to COPR
         run: |
           copr-cli build f1ana/patched-kernel-bc250 ~/rpmbuild/SRPMS/kernel-*.src.rpm
+
 
 
 
