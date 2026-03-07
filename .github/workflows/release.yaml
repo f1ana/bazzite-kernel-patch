@@ -1,43 +1,66 @@
-name: Patch Fedora Kernel Source
+name: Patch Bazzite Kernel Source
 
 on:
   schedule:
     - cron: "40 2 * * 0" # 8:40 utc monday
   workflow_dispatch:
+  # TODO:
+  # 1) set this up to run on changes to this file
+  # 2) setup renovate to update this file on new bazzite kernel releases
+  # 3) remove Pull Request kickoff
+  # 4) actually setup COPR
+  pull_request:
 
 jobs:
   patch-kernel:
     runs-on: ubuntu-latest
     container:
-      image: fedora:43
-
+      image: ubuntu-24.04
+    strategy:
+      matrix:
+        fedora_version:
+          - 43
     steps:
-      - name: Checkout repository
+      - name: Checkout local repository
         uses: actions/checkout@v4
+        path: local
 
-      - name: Install Build Tools
+      - name: Checkout upstream repository
+        uses: actions/checkout@v4
+        path: upstream
+        ref: 6.17.7-ba25
+        repository: bazzite-org/kernel-bazzite
+
+      - name: Create Build Environment
         run: |
-          dnf install -y rpm-build rpmdevtools fedpkg copr-cli
-
-      - name: Setup RPM build tree
-        run: rpmdev-setuptree
-
-      - name: Download Fedora Kernel SRPM
-        run: dnf download --source kernel
-
-      - name: Extract the SRPM
+          FEDORA_VERSION="${{ matrix.fedora_version }}"
+          sudo podman build upstream --tag 'fedora_builder' \
+            --build-arg UID=$(id -u) --build-arg GID=$(id -g) \
+            --build-arg FEDORA_VERSION=${FEDORA_VERSION}
+          sudo podman image prune -f
+      
+      - name: Add BC-250 Frequency Patch
+        run:
+          cp ./local/linux-kernel-bc250.patch ./upstream/patch-99-bc250-freq.patch
+      - name: Build Kernel SRPMs
         run: |
-          rpm -ivh kernel-*.rpm
-
-      - name: Apply Patch
-        run: |
-          cp ./linux-kernel-bc250.patch ~/rpmbuild/SOURCES
-          sed -i '/^Patch999999: linux-kernel-test.patch$/a Patch100: linux-kernel-bc250.patch' ~/rpmbuild/SPECS/kernel.spec
-          sed -i '/^ApplyOptionalPatch linux-kernel-test.patch$/a ApplyOptionalPatch linux-kernel-bc250.patch' ~/rpmbuild/SPECS/kernel.spec
-
-      - name: Build SRPM
-        run: |
-          rpmbuild -bs ~/rpmbuild/SPECS/kernel.spec
+          sudo podman run \
+            --rm \
+            -v $(pwd)/upstream:/workspace \
+            -e UID=$UID \
+            -e GID=$GID \
+            -e ARCH=x86_64 \
+            -e FEDORA_VERSION=${{ matrix.fedora_version }} \
+            fedora_builder rpmbuild \
+              --with bazzite \
+              --with ubsb -\
+                --define '_topdir   %(pwd)/build' \
+                --define '_builddir %{_topdir}/BUILD' \
+                --define '_rpmdir   %{_topdir}/RPMS' \
+                --define '_srcrpmdir %{_topdir}/SRPMS' \
+                --define '_sourcedir %(pwd)/' \
+                --define '_specdir  %(pwd)/' \
+              bs kernel.spec
 
       - name: Authenticate with COPR
         run: |
@@ -45,14 +68,14 @@ jobs:
           cat > ~/.config/copr <<EOF
           [copr-cli]
           login = ${{ secrets.COPR_LOGIN }}
-          username = f1ana
+          username = sdwilsh
           token = ${{ secrets.COPR_TOKEN }}
           copr_url = https://copr.fedorainfracloud.org
           EOF
 
       - name: Upload to COPR
         run: |
-          copr-cli build f1ana/patched-kernel-bc250 ~/rpmbuild/SRPMS/kernel-*.src.rpm
+          copr-cli build sdwilsh/kernel-bazzite-bc250 ./upstream/SRPMS/kernel-*.src.rpm
 
 
 
