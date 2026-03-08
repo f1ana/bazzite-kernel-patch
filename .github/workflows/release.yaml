@@ -29,11 +29,22 @@ jobs:
         run: |
           rpm -ivh kernel-*.rpm
 
+      - name: Log Kernel Version
+        run: |
+          echo "Downloaded SRPM: $(ls kernel-*.rpm)"
+          rpm -qp --queryformat '%{NAME}-%{VERSION}-%{RELEASE}\n' kernel-*.src.rpm
+
       - name: Apply Patch
         run: |
           cp ./linux-kernel-bc250.patch ~/rpmbuild/SOURCES
+
           sed -i '/^Patch999999: linux-kernel-test.patch$/a Patch100: linux-kernel-bc250.patch' ~/rpmbuild/SPECS/kernel.spec
+          grep -q 'Patch100: linux-kernel-bc250.patch' ~/rpmbuild/SPECS/kernel.spec || \
+            { echo "ERROR: Failed to inject Patch100 into kernel.spec — anchor line may have changed"; exit 1; }
+
           sed -i '/^ApplyOptionalPatch linux-kernel-test.patch$/a ApplyOptionalPatch linux-kernel-bc250.patch' ~/rpmbuild/SPECS/kernel.spec
+          grep -q 'ApplyOptionalPatch linux-kernel-bc250.patch' ~/rpmbuild/SPECS/kernel.spec || \
+            { echo "ERROR: Failed to inject ApplyOptionalPatch into kernel.spec — anchor line may have changed"; exit 1; }
 
       - name: Build SRPM
         run: |
