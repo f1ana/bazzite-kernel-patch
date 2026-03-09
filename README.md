@@ -1,6 +1,10 @@
-# AMD BC-250 Kernel Patch
+# ARCHIVED — AMD BC-250 Kernel Patch
 
-This repository provides a custom kernel patch for **AMD BC-250 boards**, modifying the default GPU frequency limits to unlock additional performance.
+> **This repository is no longer maintained.** The BC-250 frequency patch is now included upstream in the Bazzite kernel.
+
+---
+
+This repository previously provided a custom kernel patch for **AMD BC-250 boards**, modifying the default GPU frequency limits to unlock additional performance.
 
 ## ⚙️ Patch Details
 
